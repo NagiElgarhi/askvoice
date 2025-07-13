@@ -1,7 +1,8 @@
-
 import React, { useState, useEffect } from 'react';
 import { UploadIcon, LinkIcon, DocumentTextIcon, CheckCircleIcon, TrashIcon } from './components/Icons';
 import { Knowledge } from './types';
+import * as pdfjsLib from 'pdfjs-dist';
+import mammoth from 'mammoth';
 
 const KNOWLEDGE_KEY = 'agent_knowledge_base';
 const initialKnowledge: Knowledge = { texts: [], urls: [], files: [] };
@@ -13,11 +14,19 @@ export const AdminPage: React.FC = () => {
     
     const [currentText, setCurrentText] = useState('');
     const [currentUrl, setCurrentUrl] = useState('');
+    const [parsingFiles, setParsingFiles] = useState<string[]>([]);
 
     const [saved, setSaved] = useState(false);
     const [saving, setSaving] = useState(false);
-
+    
     useEffect(() => {
+        // Set workerSrc for pdf.js. This is required for it to work in a browser environment.
+        try {
+            pdfjsLib.GlobalWorkerOptions.workerSrc = `https://esm.sh/pdfjs-dist@4.4.168/build/pdf.worker.mjs`;
+        } catch (e) {
+            console.error("Could not set PDF worker source", e);
+        }
+
         try {
             const storedKnowledge = localStorage.getItem(KNOWLEDGE_KEY);
             if (storedKnowledge) {
@@ -37,7 +46,6 @@ export const AdminPage: React.FC = () => {
             setCurrentText('');
         }
         if (type === 'url' && currentUrl.trim()) {
-            // Check for duplicates
             if (urls.some(u => u.url === currentUrl.trim())) return;
             setUrls(prev => [...prev, { url: currentUrl.trim(), content: null }]);
             setCurrentUrl('');
@@ -53,26 +61,65 @@ export const AdminPage: React.FC = () => {
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files) {
             Array.from(e.target.files).forEach(file => {
-                const isSupported = file.type.startsWith('text/') || file.type === 'application/json' || file.name.endsWith('.md');
-                if (!isSupported) {
-                    alert(`نوع الملف ${file.name} غير مدعوم. يتم دعم الملفات النصية فقط.`);
+                const fileName = file.name;
+                const fileExtension = fileName.split('.').pop()?.toLowerCase();
+                
+                if (files.some(f => f.name === fileName) || parsingFiles.includes(fileName)) {
                     return;
                 }
 
+                const isSupported = fileExtension === 'pdf' || fileExtension === 'doc' || fileExtension === 'docx';
+                if (!isSupported) {
+                    alert(`نوع الملف ${fileName} غير مدعوم. يتم دعم ملفات PDF و Word فقط.`);
+                    return;
+                }
+                
+                setParsingFiles(prev => [...prev, fileName]);
+
                 const reader = new FileReader();
-                reader.onload = (event) => {
-                    const content = event.target?.result as string;
-                    if (content) {
-                        setFiles(prev => {
-                            if (prev.find(f => f.name === file.name)) return prev;
-                            return [...prev, { name: file.name, content }];
-                        });
+                
+                reader.onload = async (event) => {
+                    try {
+                        const arrayBuffer = event.target?.result as ArrayBuffer;
+                        if (!arrayBuffer) throw new Error("لم يتم قراءة الملف.");
+
+                        let content: string | null = null;
+
+                        if (fileExtension === 'pdf') {
+                            const typedArray = new Uint8Array(arrayBuffer);
+                            const pdf = await pdfjsLib.getDocument(typedArray).promise;
+                            let fullText = '';
+                            for (let i = 1; i <= pdf.numPages; i++) {
+                                const page = await pdf.getPage(i);
+                                const textContent = await page.getTextContent();
+                                const pageText = textContent.items.map(item => 'str' in item ? item.str : '').join(' ');
+                                fullText += pageText + '\n\n';
+                            }
+                            content = fullText.trim();
+                        } else if (fileExtension === 'docx' || fileExtension === 'doc') {
+                            const result = await mammoth.extractRawText({ arrayBuffer });
+                            content = result.value;
+                        }
+                        
+                        if (content) {
+                            setFiles(prev => [...prev, { name: fileName, content }]);
+                        }
+                    } catch (error) {
+                        console.error(`Error parsing file ${fileName}:`, error);
+                        alert(`حدث خطأ أثناء تحليل الملف: ${fileName}`);
+                    } finally {
+                        setParsingFiles(prev => prev.filter(name => name !== fileName));
                     }
                 };
-                reader.onerror = (error) => console.error("Error reading file:", error);
-                reader.readAsText(file);
+                
+                reader.onerror = () => {
+                    console.error(`Error reading file ${fileName}`);
+                    alert(`حدث خطأ أثناء قراءة الملف: ${fileName}`);
+                    setParsingFiles(prev => prev.filter(name => name !== fileName));
+                };
+                
+                reader.readAsArrayBuffer(file);
             });
-             // Reset file input to allow re-uploading the same file
             e.target.value = '';
         }
     };
@@ -208,9 +255,15 @@ export const AdminPage: React.FC = () => {
                         multiple
                         onChange={handleFileChange}
                         className="block w-full text-sm text-stone-600 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-wavy-gold-button file:text-black hover:file:shadow-md cursor-pointer"
-                        accept=".txt,.md,.json,.csv"
+                        accept=".pdf,.doc,.docx"
+                        disabled={parsingFiles.length > 0}
                      />
-                     <p className="text-sm text-stone-600 mt-2">ملاحظة: سيتم تحليل محتوى الملفات النصية والروابط واستخدامه كقاعدة معرفة. قد تفشل عملية جلب المحتوى من بعض الروابط.</p>
+                     <p className="text-sm text-stone-600 mt-2">ملاحظة: يتم دعم ملفات PDF و Word (doc, docx). سيتم استخلاص المحتوى النصي من هذه الملفات لاستخدامه في قاعدة المعرفة.</p>
+                     {parsingFiles.length > 0 && (
+                        <div className="mt-2 text-sm text-stone-700 animate-pulse">
+                           جاري تحليل: {parsingFiles.join(', ')}...
+                        </div>
+                     )}
                      {renderList(files, 'file')}
                 </div>
 
@@ -218,7 +271,7 @@ export const AdminPage: React.FC = () => {
                     <button
                         onClick={handleSave}
                         className="flex items-center justify-center gap-3 w-full sm:w-auto px-10 py-4 text-xl font-bold rounded-full transition-all duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-4 bg-wavy-gold-button text-black focus:ring-amber-500 shadow-lg disabled:opacity-50"
-                        disabled={saving || saved}
+                        disabled={saving || saved || parsingFiles.length > 0}
                     >
                         {saving ? 'جاري الحفظ...' : (saved ? <><CheckCircleIcon /> تم الحفظ!</> : 'حفظ كل التغييرات')}
                     </button>
