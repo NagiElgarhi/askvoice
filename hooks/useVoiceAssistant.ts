@@ -1,4 +1,3 @@
-
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { Status, Message } from '../types';
 import { createChatSession } from '../services/geminiService';
@@ -139,8 +138,31 @@ export const useVoiceAssistant = () => {
         try {
             const response = await chatRef.current.sendMessage({ message: text });
             if (isMounted.current) {
-                const aiResponseData = JSON.parse(response.text);
+                let aiResponseData;
+                let rawText = response.text;
+
+                // Clean the response text to extract the JSON part.
+                // It might be wrapped in ```json ... ``` or have leading/trailing text.
+                if (rawText.startsWith('```json')) {
+                    rawText = rawText.substring(7, rawText.length - 3).trim();
+                } else {
+                    const jsonStartIndex = rawText.indexOf('{');
+                    const jsonEndIndex = rawText.lastIndexOf('}');
+                    if (jsonStartIndex !== -1 && jsonEndIndex > jsonStartIndex) {
+                        rawText = rawText.substring(jsonStartIndex, jsonEndIndex + 1);
+                    }
+                }
                 
+                try {
+                    aiResponseData = JSON.parse(rawText);
+                } catch(parseError) {
+                    console.error("Failed to parse cleaned JSON:", parseError);
+                    console.error("Cleaned text that failed parsing:", rawText);
+                    console.error("Original response from API:", response.text);
+                    // Re-throw to be caught by the outer catch block
+                    throw new Error("JSON parsing failed"); 
+                }
+
                 const answerParts: string[] = aiResponseData.answer || [];
                 const spokenSummary: string = aiResponseData.spoken_summary || (answerParts.length > 0 ? answerParts[0] : '');
                 const suggested: string[] = aiResponseData.suggested_questions || [];

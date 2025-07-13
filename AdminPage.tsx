@@ -10,7 +10,7 @@ const initialKnowledge: Knowledge = { texts: [], urls: [], files: [] };
 export const AdminPage: React.FC = () => {
     const [texts, setTexts] = useState<string[]>([]);
     const [urls, setUrls] = useState<{ url: string; content: string | null }[]>([]);
-    const [files, setFiles] = useState<{ name: string; content: string }[]>([]);
+    const [files, setFiles] = useState<string[]>([]);
     
     const [currentText, setCurrentText] = useState('');
     const [currentUrl, setCurrentUrl] = useState('');
@@ -22,7 +22,7 @@ export const AdminPage: React.FC = () => {
     useEffect(() => {
         // Set workerSrc for pdf.js. This is required for it to work in a browser environment.
         try {
-            pdfjsLib.GlobalWorkerOptions.workerSrc = `https://esm.sh/pdfjs-dist@5.3.93/build/pdf.worker.mjs`;
+            pdfjsLib.GlobalWorkerOptions.workerSrc = `https://esm.sh/pdfjs-dist@4.4.175/build/pdf.worker.mjs`;
         } catch (e) {
             console.error("Could not set PDF worker source", e);
         }
@@ -30,10 +30,14 @@ export const AdminPage: React.FC = () => {
         try {
             const storedKnowledge = localStorage.getItem(KNOWLEDGE_KEY);
             if (storedKnowledge) {
-                const data: Knowledge = JSON.parse(storedKnowledge);
+                const data: Omit<Partial<Knowledge>, 'files'> & { files?: (string | { name: string; })[] } = JSON.parse(storedKnowledge);
                 setTexts(data.texts || []);
                 setUrls(data.urls || []);
-                setFiles(data.files || []);
+                 // Handle both old and new format for `files` for backwards compatibility
+                const loadedFiles = (data.files || []).map(f => 
+                    typeof f === 'string' ? f : f.name
+                ).filter(Boolean);
+                setFiles(loadedFiles);
             }
         } catch (error) {
             console.error("Failed to parse knowledge from localStorage", error);
@@ -64,7 +68,7 @@ export const AdminPage: React.FC = () => {
                 const fileName = file.name;
                 const fileExtension = fileName.split('.').pop()?.toLowerCase();
                 
-                if (files.some(f => f.name === fileName) || parsingFiles.includes(fileName)) {
+                if (files.includes(fileName) || parsingFiles.includes(fileName)) {
                     return;
                 }
 
@@ -102,7 +106,16 @@ export const AdminPage: React.FC = () => {
                         }
                         
                         if (content) {
-                            setFiles(prev => [...prev, { name: fileName, content }]);
+                            // Split content into meaningful chunks (paragraphs)
+                            const chunks = content.split(/\n\s*\n+/)
+                                .map(chunk => chunk.trim())
+                                .filter(chunk => chunk.length > 20); // Only keep chunks with more than 20 chars
+
+                            if (chunks.length > 0) {
+                                setTexts(prev => [...prev, ...chunks]);
+                            }
+                             // Add only filename to files list to mark it as processed
+                            setFiles(prev => [...prev, fileName]);
                         }
                     } catch (error) {
                         console.error(`Error parsing file ${fileName}:`, error);
@@ -203,8 +216,8 @@ export const AdminPage: React.FC = () => {
                         displayText += ' (بانتظار الحفظ)';
                     }
                 } else { // file
-                    displayText = item.name;
-                    displayTitle = item.name;
+                    displayText = item;
+                    displayTitle = item;
                 }
                 return (
                     <div key={`${type}-${index}`} className="flex items-center justify-between bg-black/5 p-2 rounded-md text-sm text-stone-800 border border-amber-600/10">
@@ -271,12 +284,13 @@ export const AdminPage: React.FC = () => {
                         accept=".pdf,.doc,.docx"
                         disabled={parsingFiles.length > 0}
                      />
-                     <p className="text-sm text-stone-600 mt-2">ملاحظة: يتم دعم ملفات PDF و Word (doc, docx). سيتم استخلاص المحتوى النصي من هذه الملفات لاستخدامه في قاعدة المعرفة.</p>
+                     <p className="text-sm text-stone-600 mt-2">ملاحظة: سيتم تحليل محتوى الملفات وتقسيمه إلى فقرات منفصلة وإضافته إلى قائمة النصوص أعلاه.</p>
                      {parsingFiles.length > 0 && (
                         <div className="mt-2 text-sm text-stone-700 animate-pulse">
                            جاري تحليل: {parsingFiles.join(', ')}...
                         </div>
                      )}
+                     {files.length > 0 && <h4 className="font-semibold mt-4 mb-2 text-stone-800">الملفات المعالجة:</h4>}
                      {renderList(files, 'file')}
                 </div>
 

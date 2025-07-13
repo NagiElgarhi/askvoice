@@ -1,4 +1,3 @@
-
 import { GoogleGenAI, Chat, Type } from "@google/genai";
 import { Knowledge } from '../types';
 
@@ -40,14 +39,10 @@ const getAugmentedSystemInstruction = async (): Promise<string> => {
             hasKnowledge = true;
             knowledgePreamble += "معلومات نصية:\n" + data.texts.join('\n---\n') + "\n\n";
         }
-
+        
         if (data.files?.length > 0) {
             hasKnowledge = true;
-            knowledgePreamble += "محتوى الملفات:\n";
-            data.files.forEach(file => {
-                knowledgePreamble += `محتوى من ملف "${file.name}":\n${file.content}\n---\n`;
-            });
-            knowledgePreamble += "\n";
+            knowledgePreamble += `تم استخلاص المعلومات من الملفات التالية التي تم تحميلها:\n` + data.files.join(', ') + `\n\n`;
         }
 
         const urlContents = data.urls?.filter(u => u.content).map(u => `محتوى من رابط ${u.url}:\n${u.content}`);
