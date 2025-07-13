@@ -12,8 +12,8 @@
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "@google/genai": "^1.9.0",
-    "pdfjs-dist": "4.4.168",
-    "mammoth": "1.8.0"
+    "pdfjs-dist": "^5.3.93",
+    "mammoth": "^1.9.1"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",

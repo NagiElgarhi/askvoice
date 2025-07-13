@@ -11,6 +11,7 @@
     <style>
         body {
             font-family: 'Cairo', sans-serif;
+            background-color: #fdfaf5;
         }
         .font-cinzel {
             font-family: 'Cinzel Decorative', cursive;
@@ -48,6 +49,10 @@
             50% { background-position: 100% 50%; }
             100% { background-position: 0% 50%; }
         }
+        
+        .bg-main-container {
+            background: linear-gradient(145deg, #fefcf7 0%, #fdeec9 100%);
+        }
 
         .bg-wavy-gold-button {
             background: linear-gradient(270deg, #c5a32c, #f9d976, #b48a02, #f3e5b0, #c5a32c);
@@ -63,14 +68,14 @@
     "react": "https://esm.sh/react@^19.1.0",
     "react-dom/": "https://esm.sh/react-dom@^19.1.0/",
     "@google/genai": "https://esm.sh/@google/genai@^1.9.0",
-    "pdfjs-dist": "https://esm.sh/pdfjs-dist@4.4.168",
-    "mammoth": "https://esm.sh/mammoth@1.8.0"
+    "pdfjs-dist": "https://esm.sh/pdfjs-dist@^5.3.93",
+    "mammoth": "https://esm.sh/mammoth@^1.9.1"
   }
 }
 </script>
 <link rel="stylesheet" href="/index.css">
 </head>
-<body class="bg-wavy-gold-button text-stone-800">
+<body class="text-stone-800">
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
 </body>

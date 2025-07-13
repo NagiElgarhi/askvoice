@@ -22,7 +22,7 @@ export const AdminPage: React.FC = () => {
     useEffect(() => {
         // Set workerSrc for pdf.js. This is required for it to work in a browser environment.
         try {
-            pdfjsLib.GlobalWorkerOptions.workerSrc = `https://esm.sh/pdfjs-dist@4.4.168/build/pdf.worker.mjs`;
+            pdfjsLib.GlobalWorkerOptions.workerSrc = `https://esm.sh/pdfjs-dist@5.3.93/build/pdf.worker.mjs`;
         } catch (e) {
             console.error("Could not set PDF worker source", e);
         }
@@ -160,7 +160,20 @@ export const AdminPage: React.FC = () => {
         setUrls(urlsWithContent);
 
         const knowledge: Knowledge = { texts, urls: urlsWithContent, files };
+        
+        // Save to localStorage for admin's persistence
         localStorage.setItem(KNOWLEDGE_KEY, JSON.stringify(knowledge));
+
+        // Create and download knowledge.json file
+        const knowledgeBlob = new Blob([JSON.stringify(knowledge, null, 2)], { type: 'application/json' });
+        const downloadUrl = URL.createObjectURL(knowledgeBlob);
+        const a = document.createElement('a');
+        a.href = downloadUrl;
+        a.download = 'knowledge.json';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(downloadUrl);
         
         setSaving(false);
         setSaved(true);
@@ -273,7 +286,7 @@ export const AdminPage: React.FC = () => {
                         className="flex items-center justify-center gap-3 w-full sm:w-auto px-10 py-4 text-xl font-bold rounded-full transition-all duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-4 bg-wavy-gold-button text-black focus:ring-amber-500 shadow-lg disabled:opacity-50"
                         disabled={saving || saved || parsingFiles.length > 0}
                     >
-                        {saving ? 'جاري الحفظ...' : (saved ? <><CheckCircleIcon /> تم الحفظ!</> : 'حفظ كل التغييرات')}
+                        {saving ? 'جاري الحفظ...' : (saved ? <><CheckCircleIcon /> تم الحفظ وتنزيل الملف!</> : 'حفظ وتنزيل الملف')}
                     </button>
                 </div>
             </div>

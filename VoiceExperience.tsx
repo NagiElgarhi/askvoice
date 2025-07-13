@@ -1,18 +1,13 @@
-import React, { useState, useEffect, useRef } from 'react';
+
+import React, { useEffect, useRef } from 'react';
 import { useVoiceAssistant } from './hooks/useVoiceAssistant';
 import { Status } from './types';
 import { ChatMessage } from './components/ChatMessage';
 import { StatusIndicator } from './components/StatusIndicator';
 import { PhoneIcon, StopCircleIcon, WhatsAppIcon } from './components/Icons';
 
-const API_KEY_LOCAL_STORAGE_KEY = 'google_api_key';
-
-interface VoiceExperienceProps {
-    setIsApiManagerOpen: (isOpen: boolean) => void;
-}
-
-export const VoiceExperience: React.FC<VoiceExperienceProps> = ({ setIsApiManagerOpen }) => {
-    const { status, transcript, startSession, stopSession, error, isSessionActive } = useVoiceAssistant();
+export const VoiceExperience: React.FC = () => {
+    const { status, transcript, startSession, stopSession, error, isSessionActive, sendSuggestedQuestion } = useVoiceAssistant();
     const chatContainerRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -25,18 +20,13 @@ export const VoiceExperience: React.FC<VoiceExperienceProps> = ({ setIsApiManage
         if (isSessionActive) {
             stopSession();
         } else {
-            let apiKey = null;
-            try {
-                apiKey = localStorage.getItem(API_KEY_LOCAL_STORAGE_KEY);
-            } catch (e) {
-                console.warn("Could not access localStorage");
-            }
-
-            if (!apiKey || apiKey.trim() === "") {
-                setIsApiManagerOpen(true);
-            } else {
-                startSession([{speaker: 'ai', text: 'أهلاً بك في خدمة العملاء، كيف يمكنني مساعدتك اليوم؟'}]);
-            }
+            const welcomeMessage = 'أهلاً بك في خدمة العملاء، كيف يمكنني مساعدتك اليوم؟';
+            startSession([{
+                speaker: 'ai', 
+                textParts: [welcomeMessage], 
+                spokenSummary: welcomeMessage,
+                suggestedQuestions: ["ما هي مواعيد عمل النقابة؟", "كيف أسجل في مشروع العلاج؟", "ما هي رسوم الاشتراك السنوي؟"]
+            }]);
         }
     };
 
@@ -55,7 +45,11 @@ export const VoiceExperience: React.FC<VoiceExperienceProps> = ({ setIsApiManage
         <div className="flex flex-col h-full">
             <main ref={chatContainerRef} className="flex-1 overflow-y-auto p-4 my-4 space-y-6">
                 {transcript.map((message, index) => (
-                    <ChatMessage key={index} message={message} />
+                    <ChatMessage 
+                        key={index} 
+                        message={message}
+                        onSuggestedQuestionClick={sendSuggestedQuestion}
+                    />
                 ))}
                 {status === Status.ERROR && error && (
                      <div className="flex justify-center">
@@ -79,7 +73,7 @@ export const VoiceExperience: React.FC<VoiceExperienceProps> = ({ setIsApiManage
                     </div>
                 </div>
 
-                <div className={`flex flex-col items-center justify-center space-y-4 ${transcript.length === 0 && !isSessionActive ? '' : 'transform -translate-y-4'}`}>
+                <div className="flex flex-col items-center justify-center space-y-4 transform -translate-y-[120px]">
                     <StatusIndicator status={status} />
                     <p className="text-lg text-amber-900 h-6 transition-opacity duration-300">{getStatusText()}</p>
                     <button

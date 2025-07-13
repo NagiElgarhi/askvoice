@@ -1,3 +1,4 @@
+
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { Status, Message } from '../types';
 import { createChatSession } from '../services/geminiService';
@@ -52,15 +53,8 @@ interface SpeechRecognitionStatic {
 const SpeechRecognition: SpeechRecognitionStatic | undefined = 
     (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
-const API_KEY_LOCAL_STORAGE_KEY = 'google_api_key';
-
 const getApiKey = (): string => {
-    try {
-        const storedKey = localStorage.getItem(API_KEY_LOCAL_STORAGE_KEY);
-        return storedKey || process.env.API_KEY || "";
-    } catch (e) {
-        return process.env.API_KEY || "";
-    }
+    return process.env.API_KEY || "";
 }
 
 export const useVoiceAssistant = () => {
@@ -145,13 +139,29 @@ export const useVoiceAssistant = () => {
         try {
             const response = await chatRef.current.sendMessage({ message: text });
             if (isMounted.current) {
-                const aiResponse = response.text;
-                setTranscript(prev => [...prev, { speaker: 'ai', text: aiResponse }]);
-                speakResponse(aiResponse);
+                const aiResponseData = JSON.parse(response.text);
+                
+                const answerParts: string[] = aiResponseData.answer || [];
+                const spokenSummary: string = aiResponseData.spoken_summary || (answerParts.length > 0 ? answerParts[0] : '');
+                const suggested: string[] = aiResponseData.suggested_questions || [];
+
+                if (answerParts.length > 0) {
+                     setTranscript(prev => [...prev, { 
+                        speaker: 'ai', 
+                        textParts: answerParts, 
+                        spokenSummary: spokenSummary,
+                        suggestedQuestions: suggested 
+                    }]);
+                    speakResponse(spokenSummary);
+                } else {
+                     const fallbackText = "لم أتمكن من إيجاد إجابة مناسبة. هل يمكنك إعادة صياغة سؤالك؟"
+                    setTranscript(prev => [...prev, { speaker: 'ai', textParts: [fallbackText], suggestedQuestions: [] }]);
+                    speakResponse(fallbackText);
+                }
             }
         } catch (e) {
-            console.error("Gemini API Error:", e);
-            const errorMessage = "عذراً، أواجه مشكلة في الاتصال بالذكاء الاصطناعي.";
+            console.error("Gemini API Error or JSON parse error:", e);
+            const errorMessage = "عذراً، أواجه مشكلة في معالجة الرد.";
             if (isMounted.current) {
                 setError(errorMessage);
                 setStatus(Status.ERROR);
@@ -170,8 +180,9 @@ export const useVoiceAssistant = () => {
 
         if (finalTranscript.trim()) {
             if (isMounted.current) {
-                setTranscript(prev => [...prev, { speaker: 'user', text: finalTranscript }]);
-                processTranscript(finalTranscript);
+                const userMessage: Message = { speaker: 'user', text: finalTranscript.trim() };
+                setTranscript(prev => [...prev, userMessage]);
+                processTranscript(finalTranscript.trim());
             }
         }
     }, [processTranscript]);
@@ -212,29 +223,34 @@ export const useVoiceAssistant = () => {
     }, [handleSpeechResult, startListening, status]);
 
 
-    const startSession = useCallback((initialMessages: Message[] = []) => {
+    const startSession = useCallback(async (initialMessages: Message[] = []) => {
         if (!SpeechRecognition) {
             setError("متصفحك لا يدعم التعرف على الصوت.");
             setStatus(Status.ERROR);
             return;
         }
         
-        const apiKey = getApiKey();
-        if (!apiKey || apiKey.trim() === "") {
-            setError("الرجاء إدخال مفتاح API صالح للبدء.");
-            setStatus(Status.ERROR);
-            return;
-        }
-
         setIsSessionActive(true);
         setError(null);
-        chatRef.current = createChatSession();
+        
+        try {
+            setStatus(Status.THINKING); // Indicate that we are setting up the session
+            chatRef.current = await createChatSession();
+        } catch(e) {
+             console.error("Failed to create chat session:", e);
+             setError("فشل في تهيئة جلسة المحادثة. تحقق من وحدة التحكم.");
+             setStatus(Status.ERROR);
+             setIsSessionActive(false);
+             return;
+        }
+
 
         setTranscript(initialMessages);
         setupRecognition();
 
-        if (initialMessages.length > 0) {
-            speakResponse(initialMessages[0].text);
+        const firstMessage = initialMessages.find(m => m.speaker === 'ai');
+        if (firstMessage?.spokenSummary) {
+             speakResponse(firstMessage.spokenSummary);
         } else {
             setTimeout(() => {
                 if(isMounted.current) startListening();
@@ -258,6 +274,18 @@ export const useVoiceAssistant = () => {
         setStatus(Status.IDLE);
         setTranscript([]);
     }, []);
+
+    const sendSuggestedQuestion = useCallback((question: string) => {
+        if (isMounted.current) {
+            const userMessage: Message = { speaker: 'user', text: question };
+            setTranscript(prev => [...prev, userMessage]);
+            processTranscript(question);
+            window.speechSynthesis.cancel();
+            if (recognitionRef.current) {
+                recognitionRef.current.abort();
+            }
+        }
+    }, [processTranscript]);
     
-    return { status, transcript, error, startSession, stopSession, isSessionActive };
+    return { status, transcript, error, startSession, stopSession, isSessionActive, sendSuggestedQuestion };
 };

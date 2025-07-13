@@ -9,8 +9,14 @@ export enum Status {
 
 export interface Message {
   speaker: 'user' | 'ai';
-  text: string;
+  // A user message will only have `text`.
+  text?: string; 
+  // An AI message will have the following properties.
+  textParts?: string[];
+  spokenSummary?: string;
+  suggestedQuestions?: string[];
 }
+
 
 export interface Knowledge {
   texts: string[];
