@@ -1,0 +1,7 @@
+{
+  "name": "Voice Customer Assistant",
+  "description": "An AI-powered voice assistant for customer service, capable of understanding and responding to user inquiries in Arabic.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
