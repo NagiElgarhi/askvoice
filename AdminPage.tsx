@@ -4,7 +4,6 @@ import { Knowledge } from './types';
 import * as pdfjsLib from 'pdfjs-dist';
 import mammoth from 'mammoth';
 
-const KNOWLEDGE_KEY = 'agent_knowledge_base';
 const initialKnowledge: Knowledge = { texts: [], urls: [], files: [] };
 
 export const AdminPage: React.FC = () => {
@@ -25,22 +24,6 @@ export const AdminPage: React.FC = () => {
             pdfjsLib.GlobalWorkerOptions.workerSrc = `https://esm.sh/pdfjs-dist@4.4.175/build/pdf.worker.mjs`;
         } catch (e) {
             console.error("Could not set PDF worker source", e);
-        }
-
-        try {
-            const storedKnowledge = localStorage.getItem(KNOWLEDGE_KEY);
-            if (storedKnowledge) {
-                const data: Omit<Partial<Knowledge>, 'files'> & { files?: (string | { name: string; })[] } = JSON.parse(storedKnowledge);
-                setTexts(data.texts || []);
-                setUrls(data.urls || []);
-                 // Handle both old and new format for `files` for backwards compatibility
-                const loadedFiles = (data.files || []).map(f => 
-                    typeof f === 'string' ? f : f.name
-                ).filter(Boolean);
-                setFiles(loadedFiles);
-            }
-        } catch (error) {
-            console.error("Failed to parse knowledge from localStorage", error);
         }
     }, []);
     
@@ -72,9 +55,9 @@ export const AdminPage: React.FC = () => {
                     return;
                 }
 
-                const isSupported = fileExtension === 'pdf' || fileExtension === 'doc' || fileExtension === 'docx';
+                const isSupported = fileExtension === 'pdf' || fileExtension === 'docx';
                 if (!isSupported) {
-                    alert(`نوع الملف ${fileName} غير مدعوم. يتم دعم ملفات PDF و Word فقط.`);
+                    alert(`نوع الملف ${fileName} غير مدعوم. يتم دعم ملفات PDF و DOCX فقط.`);
                     return;
                 }
                 
@@ -100,7 +83,7 @@ export const AdminPage: React.FC = () => {
                                 fullText += pageText + '\n\n';
                             }
                             content = fullText.trim();
-                        } else if (fileExtension === 'docx' || fileExtension === 'doc') {
+                        } else if (fileExtension === 'docx') {
                             const result = await mammoth.extractRawText({ arrayBuffer });
                             content = result.value;
                         }
@@ -174,9 +157,6 @@ export const AdminPage: React.FC = () => {
 
         const knowledge: Knowledge = { texts, urls: urlsWithContent, files };
         
-        // Save to localStorage for admin's persistence
-        localStorage.setItem(KNOWLEDGE_KEY, JSON.stringify(knowledge));
-
         // Create and download knowledge.json file
         const knowledgeBlob = new Blob([JSON.stringify(knowledge, null, 2)], { type: 'application/json' });
         const downloadUrl = URL.createObjectURL(knowledgeBlob);
@@ -281,10 +261,10 @@ export const AdminPage: React.FC = () => {
                         multiple
                         onChange={handleFileChange}
                         className="block w-full text-sm text-stone-600 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-wavy-gold-button file:text-black hover:file:shadow-md cursor-pointer"
-                        accept=".pdf,.doc,.docx"
+                        accept=".pdf,.docx"
                         disabled={parsingFiles.length > 0}
                      />
-                     <p className="text-sm text-stone-600 mt-2">ملاحظة: سيتم تحليل محتوى الملفات وتقسيمه إلى فقرات منفصلة وإضافته إلى قائمة النصوص أعلاه.</p>
+                     <p className="text-sm text-stone-600 mt-2">ملاحظة: يتم دعم ملفات PDF و DOCX فقط. سيتم تحليلها وإضافتها كنصوص منفصلة.</p>
                      {parsingFiles.length > 0 && (
                         <div className="mt-2 text-sm text-stone-700 animate-pulse">
                            جاري تحليل: {parsingFiles.join(', ')}...

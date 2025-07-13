@@ -52,10 +52,6 @@ interface SpeechRecognitionStatic {
 const SpeechRecognition: SpeechRecognitionStatic | undefined = 
     (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
-const getApiKey = (): string => {
-    return process.env.API_KEY || "";
-}
-
 export const useVoiceAssistant = () => {
     const [status, setStatus] = useState<Status>(Status.IDLE);
     const [error, setError] = useState<string | null>(null);
@@ -126,7 +122,7 @@ export const useVoiceAssistant = () => {
 
     const processTranscript = useCallback(async (text: string) => {
         if (!chatRef.current) {
-            const errorMessage = "لم تبدأ جلسة المحادثة. الرجاء التحقق من مفتاح API.";
+            const errorMessage = "لم تبدأ جلسة المحادثة. يرجى التأكد من إضافة مفتاح API صحيح عبر أيقونة المفتاح في الأعلى.";
              if (isMounted.current) {
                 setError(errorMessage);
                 setStatus(Status.ERROR);
@@ -139,28 +135,33 @@ export const useVoiceAssistant = () => {
             const response = await chatRef.current.sendMessage({ message: text });
             if (isMounted.current) {
                 let aiResponseData;
-                let rawText = response.text;
+                const rawText = response.text;
 
-                // Clean the response text to extract the JSON part.
-                // It might be wrapped in ```json ... ``` or have leading/trailing text.
-                if (rawText.startsWith('```json')) {
-                    rawText = rawText.substring(7, rawText.length - 3).trim();
-                } else {
-                    const jsonStartIndex = rawText.indexOf('{');
-                    const jsonEndIndex = rawText.lastIndexOf('}');
-                    if (jsonStartIndex !== -1 && jsonEndIndex > jsonStartIndex) {
-                        rawText = rawText.substring(jsonStartIndex, jsonEndIndex + 1);
-                    }
-                }
-                
                 try {
-                    aiResponseData = JSON.parse(rawText);
-                } catch(parseError) {
-                    console.error("Failed to parse cleaned JSON:", parseError);
-                    console.error("Cleaned text that failed parsing:", rawText);
-                    console.error("Original response from API:", response.text);
-                    // Re-throw to be caught by the outer catch block
-                    throw new Error("JSON parsing failed"); 
+                    // Use a regex to find a JSON block, either in a markdown code block or raw.
+                    const match = rawText.match(/```json\s*([\s\S]*?)\s*```|({[\s\S]*})/);
+                    if (!match) {
+                        throw new Error("لم يتم العثور على كتلة JSON في الرد.");
+                    }
+                    
+                    // Take the first valid group.
+                    const jsonString = match[1] || match[2];
+                    if (!jsonString) {
+                         throw new Error("كتلة JSON المستخرجة فارغة.");
+                    }
+
+                    aiResponseData = JSON.parse(jsonString);
+
+                } catch(parseError: any) {
+                    console.error("فشل في تحليل JSON من رد AI:", parseError);
+                    console.error("النص الأصلي من AI:", rawText);
+                    const parseErrorMessage = "عذراً، لم أتمكن من فهم رد المساعد. يبدو أنه ليس بالتنسيق الصحيح.";
+                    if (isMounted.current) {
+                        setError(parseErrorMessage);
+                        setStatus(Status.ERROR);
+                        speakResponse(parseErrorMessage);
+                    }
+                    return; // Stop further processing
                 }
 
                 const answerParts: string[] = aiResponseData.answer || [];
@@ -182,7 +183,7 @@ export const useVoiceAssistant = () => {
                 }
             }
         } catch (e) {
-            console.error("Gemini API Error or JSON parse error:", e);
+            console.error("Gemini API Error:", e);
             const errorMessage = "عذراً، أواجه مشكلة في معالجة الرد.";
             if (isMounted.current) {
                 setError(errorMessage);
@@ -260,7 +261,7 @@ export const useVoiceAssistant = () => {
             chatRef.current = await createChatSession();
         } catch(e) {
              console.error("Failed to create chat session:", e);
-             setError("فشل في تهيئة جلسة المحادثة. تحقق من وحدة التحكم.");
+             setError("فشل في تهيئة جلسة المحادثة. يرجى التأكد من إضافة مفتاح API صحيح عبر أيقونة المفتاح في الأعلى.");
              setStatus(Status.ERROR);
              setIsSessionActive(false);
              return;
@@ -296,6 +297,8 @@ export const useVoiceAssistant = () => {
         setStatus(Status.IDLE);
         setTranscript([]);
     }, []);
+
+
 
     const sendSuggestedQuestion = useCallback((question: string) => {
         if (isMounted.current) {

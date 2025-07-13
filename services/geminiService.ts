@@ -1,8 +1,11 @@
 import { GoogleGenAI, Chat, Type } from "@google/genai";
 import { Knowledge } from '../types';
 
+const API_KEY_STORAGE_KEY = 'google-ai-api-key';
+
 const getApiKey = (): string => {
-    return process.env.API_KEY || "";
+    const storedKey = localStorage.getItem(API_KEY_STORAGE_KEY);
+    return storedKey || process.env.API_KEY || "";
 }
 
 const BASE_SYSTEM_INSTRUCTION = `
@@ -89,6 +92,9 @@ const responseSchema = {
 
 export const createChatSession = async (): Promise<Chat> => {
   const apiKey = getApiKey();
+  if (!apiKey) {
+      throw new Error("API key is not available.");
+  }
   const ai = new GoogleGenAI({ apiKey: apiKey });
   const systemInstruction = await getAugmentedSystemInstruction();
 
