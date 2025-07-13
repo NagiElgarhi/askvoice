@@ -63,19 +63,32 @@ const getApiKey = (): string => {
     }
 }
 
-export const useVoiceAssistant = (isSessionActive: boolean) => {
+export const useVoiceAssistant = () => {
     const [status, setStatus] = useState<Status>(Status.IDLE);
     const [error, setError] = useState<string | null>(null);
     const [transcript, setTranscript] = useState<Message[]>([]);
+    const [isSessionActive, setIsSessionActive] = useState(false);
     
     const chatRef = useRef<Chat | null>(null);
     const recognitionRef = useRef<SpeechRecognition | null>(null);
     const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
     const isMounted = useRef(true);
 
+    const isSessionActiveRef = useRef(isSessionActive);
+    useEffect(() => {
+        isSessionActiveRef.current = isSessionActive;
+    }, [isSessionActive]);
+
     useEffect(() => {
         isMounted.current = true;
-        return () => { isMounted.current = false; };
+        return () => { 
+            isMounted.current = false;
+            // Ensure session is stopped on unmount
+            if (recognitionRef.current) {
+                recognitionRef.current.abort();
+            }
+            window.speechSynthesis.cancel();
+        };
     }, []);
 
     const startListening = useCallback(() => {
@@ -84,7 +97,8 @@ export const useVoiceAssistant = (isSessionActive: boolean) => {
             recognitionRef.current.start();
             setStatus(Status.LISTENING);
         } catch (e) {
-            console.warn("Speech recognition already started.", e);
+            // It might throw an error if it's already started, which is fine.
+            console.warn("Speech recognition could not start.", e);
         }
     }, []);
 
@@ -98,21 +112,23 @@ export const useVoiceAssistant = (isSessionActive: boolean) => {
         utteranceRef.current = utterance;
 
         utterance.onend = () => {
-            if (isMounted.current && isSessionActive) {
+            if (isMounted.current && isSessionActiveRef.current) {
                 startListening();
             } else {
-                setStatus(Status.IDLE);
+                if(isMounted.current) setStatus(Status.IDLE);
             }
         };
 
         utterance.onerror = (event: SpeechSynthesisErrorEvent) => {
             console.error('SpeechSynthesis Error:', event);
-            setError('حدث خطأ أثناء تشغيل الصوت.');
-            setStatus(Status.ERROR);
+            if (isMounted.current) {
+                setError('حدث خطأ أثناء تشغيل الصوت.');
+                setStatus(Status.ERROR);
+            }
         };
 
         window.speechSynthesis.speak(utterance);
-    }, [isSessionActive, startListening]);
+    }, [startListening]);
 
 
     const processTranscript = useCallback(async (text: string) => {
@@ -157,12 +173,8 @@ export const useVoiceAssistant = (isSessionActive: boolean) => {
                 setTranscript(prev => [...prev, { speaker: 'user', text: finalTranscript }]);
                 processTranscript(finalTranscript);
             }
-        } else {
-            if (isSessionActive && isMounted.current) {
-                startListening();
-            }
         }
-    }, [processTranscript, isSessionActive, startListening]);
+    }, [processTranscript]);
 
     const setupRecognition = useCallback(() => {
         if (!SpeechRecognition) return;
@@ -172,25 +184,32 @@ export const useVoiceAssistant = (isSessionActive: boolean) => {
         recognition.lang = 'ar-EG';
 
         recognition.onresult = handleSpeechResult;
+        
         recognition.onend = () => {
-            if (status === Status.LISTENING && isSessionActive && isMounted.current) {
+            // If the session is still supposed to be active (i.e. not ended by user), and we were listening, listen again.
+            // This handles cases where recognition ends due to silence.
+            if (isMounted.current && isSessionActiveRef.current && status === Status.LISTENING) {
                  startListening();
             }
         };
         recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-            console.error('SpeechRecognition Error:', event.error);
+            console.error('SpeechRecognition Error:', event.error, event.message);
+            if (!isMounted.current) return;
+
             if (event.error === 'no-speech') {
-                 if (isSessionActive && isMounted.current) startListening();
-            } else if (event.error === 'not-allowed') {
-                 setError("تم رفض الوصول إلى الميكروفون.");
+                 // Don't error out, just try listening again if the session is active.
+                 if (isSessionActiveRef.current) startListening();
+            } else if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+                 setError("تم رفض الوصول إلى الميكروفون. يرجى التحقق من أذونات المتصفح.");
                  setStatus(Status.ERROR);
+                 setIsSessionActive(false);
             } else {
                  setError('حدث خطأ في التعرف على الصوت.');
                  setStatus(Status.ERROR);
             }
         };
         recognitionRef.current = recognition;
-    }, [handleSpeechResult, status, isSessionActive, startListening]);
+    }, [handleSpeechResult, startListening, status]);
 
 
     const startSession = useCallback((initialMessages: Message[] = []) => {
@@ -207,6 +226,7 @@ export const useVoiceAssistant = (isSessionActive: boolean) => {
             return;
         }
 
+        setIsSessionActive(true);
         setError(null);
         chatRef.current = createChatSession();
 
@@ -216,7 +236,6 @@ export const useVoiceAssistant = (isSessionActive: boolean) => {
         if (initialMessages.length > 0) {
             speakResponse(initialMessages[0].text);
         } else {
-            // Delay starting listening slightly to allow setup
             setTimeout(() => {
                 if(isMounted.current) startListening();
             }, 100);
@@ -224,6 +243,7 @@ export const useVoiceAssistant = (isSessionActive: boolean) => {
     }, [setupRecognition, speakResponse, startListening]);
 
     const stopSession = useCallback(() => {
+        setIsSessionActive(false);
         if (recognitionRef.current) {
             recognitionRef.current.onresult = null;
             recognitionRef.current.onend = null;
@@ -232,11 +252,12 @@ export const useVoiceAssistant = (isSessionActive: boolean) => {
         }
         if (utteranceRef.current) {
             utteranceRef.current.onend = null;
-            window.speechSynthesis.cancel();
         }
+        window.speechSynthesis.cancel();
+        
         setStatus(Status.IDLE);
         setTranscript([]);
     }, []);
     
-    return { status, transcript, error, startSession, stopSession };
+    return { status, transcript, error, startSession, stopSession, isSessionActive };
 };

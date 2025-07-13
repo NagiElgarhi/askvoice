@@ -20,15 +20,11 @@
             display: inline-block;
             vertical-align: -0.3em; /* Fine-tune vertical alignment */
             margin: 0 -0.05em; /* Adjust spacing around the letter */
-            background: linear-gradient(45deg, #FFD700, #A0522D);
+            background: linear-gradient(45deg, #2c1e02, #8b6d1e);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
             text-fill-color: transparent;
-        }
-        .bg-glass-gradient {
-            /* From dark gold, to mid gold, to dark gold */
-            background-image: linear-gradient(to right, rgba(70, 55, 15, 0.8), rgba(130, 100, 30, 0.8), rgba(70, 55, 15, 0.8));
         }
         .pulse {
             animation: pulse-animation 1.5s infinite;
@@ -53,16 +49,10 @@
             100% { background-position: 0% 50%; }
         }
 
-        .bg-wavy-gold {
-            background: linear-gradient(270deg, #b48a02, #f9d976, #c5a32c, #f3e5b0, #b48a02);
-            background-size: 400% 400%;
-            animation: wavy-gold 4s ease-in-out infinite;
-        }
-
         .bg-wavy-gold-button {
             background: linear-gradient(270deg, #c5a32c, #f9d976, #b48a02, #f3e5b0, #c5a32c);
             background-size: 400% 400%;
-            animation: wavy-gold 3s ease-in-out infinite;
+            animation: wavy-gold 4s ease-in-out infinite;
         }
 
     </style>
@@ -78,7 +68,7 @@
 </script>
 <link rel="stylesheet" href="/index.css">
 </head>
-<body class="bg-wavy-gold text-gray-800">
+<body class="bg-wavy-gold-button text-stone-800">
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
 </body>

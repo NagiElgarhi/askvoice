@@ -12,8 +12,7 @@ interface VoiceExperienceProps {
 }
 
 export const VoiceExperience: React.FC<VoiceExperienceProps> = ({ setIsApiManagerOpen }) => {
-    const [isSessionActive, setIsSessionActive] = useState(false);
-    const { status, transcript, startSession, stopSession, error } = useVoiceAssistant(isSessionActive);
+    const { status, transcript, startSession, stopSession, error, isSessionActive } = useVoiceAssistant();
     const chatContainerRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -25,7 +24,6 @@ export const VoiceExperience: React.FC<VoiceExperienceProps> = ({ setIsApiManage
     const handleToggleSession = () => {
         if (isSessionActive) {
             stopSession();
-            setIsSessionActive(false);
         } else {
             let apiKey = null;
             try {
@@ -38,7 +36,6 @@ export const VoiceExperience: React.FC<VoiceExperienceProps> = ({ setIsApiManage
                 setIsApiManagerOpen(true);
             } else {
                 startSession([{speaker: 'ai', text: 'أهلاً بك في خدمة العملاء، كيف يمكنني مساعدتك اليوم؟'}]);
-                setIsSessionActive(true);
             }
         }
     };
@@ -60,24 +57,31 @@ export const VoiceExperience: React.FC<VoiceExperienceProps> = ({ setIsApiManage
                 {transcript.map((message, index) => (
                     <ChatMessage key={index} message={message} />
                 ))}
+                {status === Status.ERROR && error && (
+                     <div className="flex justify-center">
+                        <div className="bg-red-200 border border-red-400 text-red-800 p-3 rounded-lg max-w-md text-center">
+                            {error}
+                        </div>
+                    </div>
+                )}
             </main>
 
-            <footer className={`relative flex flex-col items-center justify-center p-4 flex-shrink-0 ${transcript.length === 0 ? 'flex-1' : ''}`}>
+            <footer className={`relative flex flex-col items-center justify-center p-4 flex-shrink-0 ${transcript.length === 0 && !isSessionActive ? 'flex-1' : ''}`}>
                 <div className="absolute bottom-2 right-0 left-0 text-center opacity-90 px-4">
-                     <p className="font-cinzel text-xs text-gray-400 select-none">
+                     <p className="font-cinzel text-xs text-stone-700 select-none">
                         الحقوق الملكية لـ : Nagi<span className="z-special">z</span> Smart Solutions - NSS - 2025 C
                     </p>
                     <div className="flex items-center justify-center gap-2 mt-2.5">
-                        <WhatsAppIcon className="h-4 w-4 text-green-500"/>
-                        <a href="https://wa.me/201066802250" target="_blank" rel="noopener noreferrer" className="text-gray-300 hover:text-green-400 transition-colors text-sm" dir="ltr">
+                        <WhatsAppIcon className="h-4 w-4 text-green-600"/>
+                        <a href="https://wa.me/201066802250" target="_blank" rel="noopener noreferrer" className="text-stone-800 hover:text-green-600 transition-colors text-sm" dir="ltr">
                             00201066802250
                         </a>
                     </div>
                 </div>
 
-                <div className="flex flex-col items-center justify-center space-y-4 transform -translate-y-[150px]">
+                <div className={`flex flex-col items-center justify-center space-y-4 ${transcript.length === 0 && !isSessionActive ? '' : 'transform -translate-y-4'}`}>
                     <StatusIndicator status={status} />
-                    <p className="text-lg text-gray-400 h-6 transition-opacity duration-300">{getStatusText()}</p>
+                    <p className="text-lg text-amber-900 h-6 transition-opacity duration-300">{getStatusText()}</p>
                     <button
                         onClick={handleToggleSession}
                         className={`flex items-center justify-center gap-3 px-8 py-4 text-xl font-bold rounded-full transition-all duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-4 shadow-lg ${

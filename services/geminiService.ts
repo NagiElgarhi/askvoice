@@ -37,17 +37,32 @@ const getAugmentedSystemInstruction = (): string => {
         knowledgePreamble += "استخدم المعلومات التالية بصرامة كمصدر وحيد للإجابة على أسئلة المستخدم. إذا لم تكن المعلومات المطلوبة موجودة هنا، فأخبر المستخدم بأنك لا تملك هذه المعلومة.\n\n";
 
         let hasKnowledge = false;
+        
         if (data.texts?.length > 0) {
             knowledgePreamble += "معلومات نصية:\n" + data.texts.join('\n---\n') + "\n\n";
             hasKnowledge = true;
         }
+
         if (data.urls?.length > 0) {
-            knowledgePreamble += "روابط مرجعية (افترض أن محتواها معروف لديك):\n" + data.urls.join('\n') + "\n\n";
-            hasKnowledge = true;
+            const urlContents = data.urls
+                .map(u => u.content)
+                .filter(c => c && c.trim() !== '')
+                .join('\n---\n');
+            if (urlContents) {
+                knowledgePreamble += "محتوى من روابط:\n" + urlContents + "\n\n";
+                hasKnowledge = true;
+            }
         }
+        
         if (data.files?.length > 0) {
-            knowledgePreamble += "ملفات مرجعية (افترض أن محتواها معروف لديك):\n" + data.files.join('\n') + "\n\n";
-            hasKnowledge = true;
+            const fileContents = data.files
+                .map(f => f.content)
+                .filter(c => c && c.trim() !== '')
+                .join('\n---\n');
+            if (fileContents) {
+                knowledgePreamble += "محتوى من ملفات:\n" + fileContents + "\n\n";
+                hasKnowledge = true;
+            }
         }
 
         knowledgePreamble += "--- نهاية قاعدة المعرفة ---\n\n";

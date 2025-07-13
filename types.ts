@@ -14,6 +14,6 @@ export interface Message {
 
 export interface Knowledge {
   texts: string[];
-  urls: string[];
-  files: string[];
+  urls: { url: string; content: string | null }[];
+  files: { name: string; content: string }[];
 }
