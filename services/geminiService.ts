@@ -8,6 +8,33 @@ const getApiKey = (): string => {
     return storedKey || process.env.API_KEY || "";
 }
 
+export const extractTextFromData = async (base64Data: string, mimeType: string): Promise<string> => {
+    const apiKey = getApiKey();
+    if (!apiKey) {
+        throw new Error("لم يتم تكوين مفتاح API. يرجى إضافته عبر أيقونة المفتاح.");
+    }
+    const ai = new GoogleGenAI({ apiKey });
+
+    const filePart = {
+        inlineData: {
+            data: base64Data,
+            mimeType: mimeType
+        }
+    };
+
+    const textPart = {
+        text: "Extract all text content from the provided document. Respond only with the extracted text, without any additional comments, introductions, or summaries."
+    };
+    
+    const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: { parts: [filePart, textPart] }
+    });
+    
+    return response.text;
+};
+
+
 const BASE_SYSTEM_INSTRUCTION = `
 أنت مساعد ذكي لأطباء نقابة القاهرة. مهمتك هي الرد على استفسارات الأطباء بدقة واحترافية بناءً على قاعدة المعرفة المتوفرة لديك.
 

@@ -1,9 +1,7 @@
-
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import { UploadIcon, DocumentTextIcon, CheckCircleIcon, TrashIcon } from './components/Icons';
 import { Knowledge } from './types';
-import * as pdfjsLib from 'pdfjs-dist';
-import mammoth from 'mammoth';
+import { extractTextFromData } from './services/geminiService';
 
 interface ProcessedFile {
     name: string;
@@ -16,24 +14,17 @@ export const AdminPage: React.FC = () => {
     const [saved, setSaved] = useState(false);
     const [saving, setSaving] = useState(false);
     
-    useEffect(() => {
-        try {
-            pdfjsLib.GlobalWorkerOptions.workerSrc = `https://esm.sh/pdfjs-dist@4.4.175/build/pdf.worker.mjs`;
-        } catch (e) {
-            console.error("Could not set PDF worker source", e);
-        }
-    }, []);
-
     const processFile = useCallback(async (file: File) => {
         const fileName = file.name;
-        const fileExtension = fileName.split('.').pop()?.toLowerCase();
         
         if (processedFiles.some(pf => pf.name === fileName) || parsingFiles.includes(fileName)) {
             alert(`تمت معالجة الملف ${fileName} بالفعل.`);
             return;
         }
 
-        const isSupported = fileExtension === 'pdf' || fileExtension === 'docx';
+        const mimeType = file.type;
+        const isSupported = mimeType === 'application/pdf' || mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+
         if (!isSupported) {
             alert(`نوع الملف ${fileName} غير مدعوم. يتم دعم ملفات PDF و DOCX فقط.`);
             return;
@@ -45,45 +36,36 @@ export const AdminPage: React.FC = () => {
         
         reader.onload = async (event) => {
             try {
-                const arrayBuffer = event.target?.result as ArrayBuffer;
-                if (!arrayBuffer) throw new Error("لم يتم قراءة الملف.");
+                const dataUrl = event.target?.result as string;
+                if (!dataUrl) throw new Error("لم يتم قراءة الملف.");
 
-                let content: string | null = null;
+                const base64Data = dataUrl.split(',')[1];
+                if (!base64Data) throw new Error("Could not extract base64 data from file.");
 
-                if (fileExtension === 'pdf') {
-                    const typedArray = new Uint8Array(arrayBuffer);
-                    const pdf = await pdfjsLib.getDocument(typedArray).promise;
-                    let fullText = '';
-                    for (let i = 1; i <= pdf.numPages; i++) {
-                        const page = await pdf.getPage(i);
-                        const textContent = await page.getTextContent();
-                        const pageText = textContent.items.map(item => 'str' in item ? item.str : '').join(' ');
-                        fullText += pageText + '\n\n';
-                    }
-                    content = fullText.trim();
-                } else if (fileExtension === 'docx') {
-                    const result = await mammoth.extractRawText({ arrayBuffer });
-                    content = result.value;
-                }
+                const extractedText = await extractTextFromData(base64Data, mimeType);
                 
-                if (content) {
-                    setProcessedFiles(prev => [...prev, { name: fileName, text: content }]);
+                if (extractedText) {
+                    setProcessedFiles(prev => [...prev, { name: fileName, text: extractedText.trim() }]);
+                } else {
+                     throw new Error("لم يتمكن المساعد من استخلاص أي نص.");
                 }
-            } catch (error) {
-                console.error(`Error parsing file ${fileName}:`, error);
-                alert(`حدث خطأ أثناء تحليل الملف: ${fileName}`);
+            } catch (error: any) {
+                console.error(`Error processing file ${fileName} with Gemini:`, error);
+                const errorMessage = error.message || 'An unknown error occurred while processing with the AI.';
+                alert(`حدث خطأ أثناء تحليل الملف عبر المساعد: ${fileName}\n\nالتفاصيل: ${errorMessage}`);
             } finally {
                 setParsingFiles(prev => prev.filter(name => name !== fileName));
             }
         };
         
         reader.onerror = () => {
-            console.error(`Error reading file ${fileName}`);
-            alert(`حدث خطأ أثناء قراءة الملف: ${fileName}`);
+            const errorDetails = reader.error?.message || 'Unknown file reading error.';
+            console.error(`Error reading file ${fileName}:`, reader.error);
+            alert(`حدث خطأ أثناء قراءة الملف: ${fileName}\n\nالتفاصيل: ${errorDetails}`);
             setParsingFiles(prev => prev.filter(name => name !== fileName));
         };
         
-        reader.readAsArrayBuffer(file);
+        reader.readAsDataURL(file);
     }, [processedFiles, parsingFiles]);
 
     const handleFileSelection = (files: FileList | null) => {
@@ -160,14 +142,14 @@ export const AdminPage: React.FC = () => {
                         multiple
                         className="hidden"
                         onChange={(e) => handleFileSelection(e.target.files)}
-                        accept=".pdf,.docx"
+                        accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                         disabled={parsingFiles.length > 0}
                     />
                 </div>
 
                 {parsingFiles.length > 0 && (
                     <div className="text-center text-sm text-stone-700 animate-pulse">
-                        جاري تحليل: {parsingFiles.join(', ')}...
+                        جاري تحليل: {parsingFiles.join(', ')}... (قد يستغرق هذا بعض الوقت)
                     </div>
                 )}
 
