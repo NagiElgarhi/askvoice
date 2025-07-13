@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Message } from '../types';
 import { UserIcon, BotIcon, ClipboardIcon, CheckIcon, ChevronLeftIcon, ChevronRightIcon } from './Icons';
@@ -34,15 +33,15 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, onSuggestedQu
   return (
     <div className={`flex items-start gap-3 sm:gap-4 my-4 ${isUser ? 'justify-end' : 'justify-start'}`}>
       {!isUser && (
-        <div className="flex-shrink-0 w-10 h-10 rounded-full bg-amber-800 flex items-center justify-center shadow-md text-white">
+        <div className="flex-shrink-0 w-10 h-10 rounded-full bg-wavy-gold-button flex items-center justify-center shadow-md text-black">
           <BotIcon />
         </div>
       )}
       <div
-        className={`relative max-w-sm sm:max-w-md lg:max-w-2xl p-4 rounded-2xl shadow-lg flex flex-col ${
+        className={`relative max-w-sm sm:max-w-md lg:max-w-2xl p-4 rounded-2xl shadow-lg flex flex-col bg-simple-gold-gradient text-stone-800 ${
           isUser
-            ? 'bg-amber-900 text-white rounded-br-none'
-            : 'bg-amber-700 text-amber-50 rounded-bl-none'
+            ? 'rounded-br-none'
+            : 'rounded-bl-none'
         }`}
       >
         {/* Main Content */}
@@ -50,7 +49,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, onSuggestedQu
             {hasMultipleParts && (
                  <button 
                     onClick={goToPrev} 
-                    className="absolute right-full mr-2 top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-black/10 hover:bg-black/20 text-stone-700 hover:text-black transition-all"
+                    className="absolute right-full mr-2 top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-black/10 hover:bg-black/20 text-stone-700 hover:text-stone-900 transition-all"
                     aria-label="Previous"
                  >
                      <ChevronRightIcon className="w-5 h-5" />
@@ -60,7 +59,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, onSuggestedQu
             {hasMultipleParts && (
                  <button 
                     onClick={goToNext} 
-                    className="absolute left-full ml-2 top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-black/10 hover:bg-black/20 text-stone-700 hover:text-black transition-all"
+                    className="absolute left-full ml-2 top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-black/10 hover:bg-black/20 text-stone-700 hover:text-stone-900 transition-all"
                     aria-label="Next"
                  >
                      <ChevronLeftIcon className="w-5 h-5" />
@@ -69,19 +68,19 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, onSuggestedQu
         </div>
 
         {/* Footer for AI messages */}
-        {!isUser && (
-            <div className="mt-3 pt-2 border-t border-amber-200/20">
+        {!isUser && textParts.length > 0 && (
+            <div className="mt-3 pt-2 border-t border-amber-900/20">
                 <div className="flex justify-between items-center text-xs">
                     <button
                         onClick={handleCopy}
-                        className="flex items-center gap-1.5 p-1 rounded-full text-amber-200/80 hover:text-white hover:bg-black/20 transition-all duration-200"
+                        className="flex items-center gap-1.5 p-1 rounded-full text-stone-700 hover:text-stone-900 hover:bg-black/10 transition-all duration-200"
                         aria-label={copied ? "تم النسخ!" : "نسخ النص"}
                     >
-                        {copied ? <CheckIcon className="w-4 h-4 text-green-400" /> : <ClipboardIcon className="w-4 h-4" />}
+                        {copied ? <CheckIcon className="w-4 h-4 text-green-600" /> : <ClipboardIcon className="w-4 h-4" />}
                         <span className={`transition-opacity ${copied ? 'opacity-100' : 'opacity-0'}`}>تم!</span>
                     </button>
                      {hasMultipleParts && (
-                        <div className="font-mono text-amber-200/70 select-none">
+                        <div className="font-mono text-stone-600 select-none">
                             {currentPart + 1} / {textParts.length}
                         </div>
                     )}
@@ -93,7 +92,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, onSuggestedQu
                             <button
                                 key={i}
                                 onClick={() => onSuggestedQuestionClick?.(q)}
-                                className="px-3 py-1.5 text-sm bg-black/10 text-amber-50 rounded-full hover:bg-black/20 transition-colors"
+                                className="px-3 py-1.5 text-sm bg-amber-600/10 text-amber-900 rounded-full hover:bg-amber-600/20 transition-colors"
                             >
                                 {q}
                             </button>
@@ -104,7 +103,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, onSuggestedQu
         )}
       </div>
        {isUser && (
-        <div className="flex-shrink-0 w-10 h-10 rounded-full bg-stone-600 flex items-center justify-center shadow-md text-white">
+        <div className="flex-shrink-0 w-10 h-10 rounded-full bg-wavy-gold-button flex items-center justify-center shadow-md text-black">
           <UserIcon />
         </div>
       )}

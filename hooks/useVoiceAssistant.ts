@@ -1,3 +1,4 @@
+
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { Status, Message } from '../types';
 import { createChatSession } from '../services/geminiService';
@@ -68,6 +69,11 @@ export const useVoiceAssistant = () => {
         isSessionActiveRef.current = isSessionActive;
     }, [isSessionActive]);
 
+    const statusRef = useRef(status);
+    useEffect(() => {
+        statusRef.current = status;
+    }, [status]);
+
     useEffect(() => {
         isMounted.current = true;
         return () => { 
@@ -93,30 +99,75 @@ export const useVoiceAssistant = () => {
 
     const speakResponse = useCallback((text: string) => {
         if (!isMounted.current) return;
-        setStatus(Status.SPEAKING);
-        
-        const utterance = new SpeechSynthesisUtterance(text);
-        utterance.lang = 'ar-EG'; // Set language to Egyptian Arabic
-        utterance.rate = 1.1;
-        utteranceRef.current = utterance;
 
-        utterance.onend = () => {
-            if (isMounted.current && isSessionActiveRef.current) {
-                startListening();
-            } else {
-                if(isMounted.current) setStatus(Status.IDLE);
+        const getVoices = (): Promise<SpeechSynthesisVoice[]> => {
+            return new Promise(resolve => {
+                let voices = window.speechSynthesis.getVoices();
+                if (voices.length > 0) {
+                    return resolve(voices);
+                }
+                window.speechSynthesis.onvoiceschanged = () => {
+                    voices = window.speechSynthesis.getVoices();
+                    resolve(voices);
+                };
+            });
+        };
+
+        const executeSpeak = async () => {
+            // Cancel any currently speaking utterance to prevent overlap
+            window.speechSynthesis.cancel();
+            if (!isMounted.current) return;
+            
+            setStatus(Status.SPEAKING);
+
+            const utterance = new SpeechSynthesisUtterance(text);
+            try {
+                const voices = await getVoices();
+                
+                // Prioritize "Hoda" voice for quality
+                let desiredVoice = voices.find(v => v.name === 'Hoda' && v.lang === 'ar-EG');
+                
+                // If Hoda is not found, find any other Egyptian Arabic voice
+                if (!desiredVoice) {
+                    desiredVoice = voices.find(v => v.lang === 'ar-EG');
+                }
+
+                if (desiredVoice) {
+                    utterance.voice = desiredVoice;
+                }
+
+                utterance.lang = 'ar-EG';
+                utterance.rate = 1.0;
+                utteranceRef.current = utterance;
+
+                utterance.onend = () => {
+                    if (isMounted.current && isSessionActiveRef.current) {
+                        startListening();
+                    } else {
+                        if (isMounted.current) setStatus(Status.IDLE);
+                    }
+                };
+
+                utterance.onerror = (event: SpeechSynthesisErrorEvent) => {
+                    console.error('SpeechSynthesis Error:', event);
+                    if (isMounted.current) {
+                        setError('حدث خطأ أثناء تشغيل الصوت.');
+                        setStatus(Status.ERROR);
+                    }
+                };
+
+                window.speechSynthesis.speak(utterance);
+            } catch (err) {
+                 console.error("Could not get voices for speech synthesis", err);
+                 // Fallback to speaking without a specific voice
+                 if (isMounted.current) {
+                     window.speechSynthesis.speak(utterance);
+                 }
             }
         };
 
-        utterance.onerror = (event: SpeechSynthesisErrorEvent) => {
-            console.error('SpeechSynthesis Error:', event);
-            if (isMounted.current) {
-                setError('حدث خطأ أثناء تشغيل الصوت.');
-                setStatus(Status.ERROR);
-            }
-        };
+        executeSpeak();
 
-        window.speechSynthesis.speak(utterance);
     }, [startListening]);
 
 
@@ -182,9 +233,9 @@ export const useVoiceAssistant = () => {
                     speakResponse(fallbackText);
                 }
             }
-        } catch (e) {
+        } catch (e: any) {
             console.error("Gemini API Error:", e);
-            const errorMessage = "عذراً، أواجه مشكلة في معالجة الرد.";
+            const errorMessage = e.message || "عذراً، أواجه مشكلة في معالجة الرد.";
             if (isMounted.current) {
                 setError(errorMessage);
                 setStatus(Status.ERROR);
@@ -220,20 +271,26 @@ export const useVoiceAssistant = () => {
         recognition.onresult = handleSpeechResult;
         
         recognition.onend = () => {
-            // If the session is still supposed to be active (i.e. not ended by user), and we were listening, listen again.
-            // This handles cases where recognition ends due to silence.
-            if (isMounted.current && isSessionActiveRef.current && status === Status.LISTENING) {
+            // If the session is still supposed to be active (i.e. not ended by user), 
+            // and the assistant's state is still 'LISTENING', it means recognition ended
+            // due to silence. We restart it to maintain a seamless experience.
+            if (isMounted.current && isSessionActiveRef.current && statusRef.current === Status.LISTENING) {
                  startListening();
             }
         };
+        
         recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-            console.error('SpeechRecognition Error:', event.error, event.message);
             if (!isMounted.current) return;
 
-            if (event.error === 'no-speech') {
-                 // Don't error out, just try listening again if the session is active.
-                 if (isSessionActiveRef.current) startListening();
-            } else if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+            // 'no-speech' and 'aborted' are not critical errors. 
+            // The onend handler will gracefully restart the listening loop if the session is active.
+            if (event.error === 'no-speech' || event.error === 'aborted') {
+                console.log(`Speech recognition event: ${event.error}.`);
+                return;
+            }
+
+            console.error('SpeechRecognition Error:', event.error, event.message);
+            if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
                  setError("تم رفض الوصول إلى الميكروفون. يرجى التحقق من أذونات المتصفح.");
                  setStatus(Status.ERROR);
                  setIsSessionActive(false);
@@ -243,7 +300,7 @@ export const useVoiceAssistant = () => {
             }
         };
         recognitionRef.current = recognition;
-    }, [handleSpeechResult, startListening, status]);
+    }, [handleSpeechResult, startListening]);
 
 
     const startSession = useCallback(async (initialMessages: Message[] = []) => {
@@ -259,9 +316,9 @@ export const useVoiceAssistant = () => {
         try {
             setStatus(Status.THINKING); // Indicate that we are setting up the session
             chatRef.current = await createChatSession();
-        } catch(e) {
+        } catch(e: any) {
              console.error("Failed to create chat session:", e);
-             setError("فشل في تهيئة جلسة المحادثة. يرجى التأكد من إضافة مفتاح API صحيح عبر أيقونة المفتاح في الأعلى.");
+             setError(e.message || "فشل في تهيئة جلسة المحادثة. يرجى التأكد من إضافة مفتاح API صحيح عبر أيقونة المفتاح في الأعلى.");
              setStatus(Status.ERROR);
              setIsSessionActive(false);
              return;

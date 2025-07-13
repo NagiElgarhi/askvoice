@@ -39,9 +39,9 @@
              animation: pulse-thinking-animation 1.5s infinite;
         }
         @keyframes pulse-thinking-animation {
-            0% { box-shadow: 0 0 0 0 rgba(168, 85, 247, 0.7); }
-            70% { box-shadow: 0 0 0 20px rgba(168, 85, 247, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(168, 85, 247, 0); }
+            0% { box-shadow: 0 0 0 0 rgba(217, 119, 6, 0.7); } /* Amber 600 */
+            70% { box-shadow: 0 0 0 20px rgba(217, 119, 6, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(217, 119, 6, 0); }
         }
         
         @keyframes wavy-gold {
@@ -58,6 +58,35 @@
             background: linear-gradient(270deg, #c5a32c, #f9d976, #b48a02, #f3e5b0, #c5a32c);
             background-size: 400% 400%;
             animation: wavy-gold 4s ease-in-out infinite;
+        }
+        
+        .bg-wavy-gold-button-reversed {
+            background: linear-gradient(90deg, #c5a32c, #f9d976, #b48a02, #f3e5b0, #c5a32c);
+            background-size: 400% 400%;
+            animation: wavy-gold 4s ease-in-out infinite;
+        }
+
+        .text-shadow {
+            text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.4);
+        }
+        .bg-simple-gold-gradient {
+            background: linear-gradient(145deg, #f3e5b0, #d6b56a);
+        }
+        
+        /* Custom Scrollbar Styles */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(243, 229, 176, 0.2); /* Light amber background */
+        }
+        ::-webkit-scrollbar-thumb {
+            background: linear-gradient(145deg, #f3e5b0, #c5a32c);
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(145deg, #f9d976, #b48a02);
         }
 
     </style>

@@ -36,7 +36,7 @@ export const extractTextFromData = async (base64Data: string, mimeType: string):
 
 
 const BASE_SYSTEM_INSTRUCTION = `
-أنت مساعد ذكي لأطباء نقابة القاهرة. مهمتك هي الرد على استفسارات الأطباء بدقة واحترافية بناءً على قاعدة المعرفة المتوفرة لديك.
+أنت مساعد ذكي لمشروع العلاج التابع لاتحاد نقابات المهن الطبية. مهمتك هي الرد على استفسارات الأطباء بدقة واحترافية بناءً على قاعدة المعرفة المتوفرة لديك.
 
 يجب أن تكون ردودك:
 1.  **دقيقة وموثوقة**: استند فقط إلى المعلومات الموجودة في قاعدة المعرفة. إذا كانت المعلومة غير موجودة، أجب بوضوح "لا أملك معلومات حول هذا الموضوع في قاعدة بياناتي".
@@ -47,7 +47,7 @@ const BASE_SYSTEM_INSTRUCTION = `
 - يجب عليك تنسيق ردك بالكامل ككائن JSON واحد يلتزم بشكل صارم بالمخطط المحدد.
 - إذا كان سؤال المستخدم يمكن الإجابة عليه في كتلة نصية واحدة، فيجب أن تحتوي مصفوفة "answer" على عنصر واحد فقط.
 - إذا كانت الإجابة تحتوي على أجزاء مميزة متعددة (مثل قائمة خطوات، خيارات مختلفة)، فقم بتقسيمها إلى سلاسل نصية متعددة في مصفوفة "answer".
-- قدم دائمًا 3-4 أسئلة متابعة مقترحة قد يطرحها المستخدم.
+- قدم دائمًا سؤالين اثنين فقط للمتابعة يكونان ذوي صلة عالية و يمكن الإجابة عليهما جيدًا.
 - يجب أن يكون "spoken_summary" موجزًا ومناسبًا للقراءة بصوت عالٍ. إذا كانت الإجابة متعددة الأجزاء، فيجب أن يكون "spoken_summary" مقدمة موجزة، مثل: 'تتكون العملية من ثلاث خطوات رئيسية. الخطوة الأولى هي... يمكنك رؤية الخطوات الأخرى على الشاشة.'
 `;
 
@@ -55,7 +55,11 @@ const getAugmentedSystemInstruction = async (): Promise<string> => {
     try {
         const response = await fetch('/knowledge.json');
         if (!response.ok) {
-            console.error("Failed to fetch knowledge.json, using base instruction.");
+            if (response.status === 404) {
+                 console.warn("knowledge.json not found. Using base instruction.");
+            } else {
+                console.error(`Failed to fetch knowledge.json (status: ${response.status}), using base instruction.`);
+            }
             return BASE_SYSTEM_INSTRUCTION;
         }
 
@@ -90,6 +94,7 @@ const getAugmentedSystemInstruction = async (): Promise<string> => {
 
     } catch (error) {
         console.error("Failed to read or parse knowledge.json:", error);
+        throw new Error("ملف قاعدة المعرفة موجود ولكنه تالف. يرجى مراجعة صفحة الإدارة لإعادة إنشائه.");
     }
     
     return BASE_SYSTEM_INSTRUCTION;
@@ -109,7 +114,7 @@ const responseSchema = {
         },
         suggested_questions: {
             type: Type.ARRAY,
-            description: "قائمة من 3-4 أسئلة متابعة مقترحة قد يطرحها المستخدم.",
+            description: "قائمة من سؤالين اثنين للمتابعة مقترحين قد يطرحهما المستخدم.",
             items: { type: Type.STRING }
         }
     },

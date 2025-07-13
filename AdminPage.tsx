@@ -8,11 +8,46 @@ interface ProcessedFile {
     text: string;
 }
 
+const InstructionsModal: React.FC<{ onClose: () => void }> = ({ onClose }) => (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={onClose}>
+        <div 
+            className="bg-white p-6 sm:p-8 rounded-2xl shadow-2xl max-w-2xl w-full mx-auto ring-1 ring-amber-300" 
+            onClick={(e) => e.stopPropagation()}
+        >
+            <h2 className="text-2xl font-bold text-amber-800 mb-4 text-center">تم تنزيل الملف بنجاح!</h2>
+            <p className="text-lg mb-6 text-stone-700 text-center">
+                الآن، يرجى اتباع هذه الخطوات الهامة جداً لتحديث المساعد:
+            </p>
+            <div className="bg-amber-50 p-6 rounded-lg border border-amber-200">
+                <ol className="list-decimal list-inside space-y-3 text-base text-stone-800" style={{ direction: 'rtl', textAlign: 'right' }}>
+                    <li>اذهب إلى مجلد مشروعك على جهاز الكمبيوتر الخاص بك.</li>
+                    <li>ابحث عن الملف القديم المسمى <code>knowledge.json</code>.</li>
+                    <li className="font-bold text-red-700 bg-red-100 p-2 rounded-md">
+                        <span className="font-mono text-xl mr-2">❗</span>
+                        احذف الملف القديم بالكامل.
+                    </li>
+                    <li>ابحث عن الملف الجديد الذي قمت بتنزيله للتو (اسمه أيضاً <code>knowledge.json</code>) وانقله إلى نفس مكان الملف القديم.</li>
+                </ol>
+            </div>
+            <p className="mt-4 text-sm text-stone-600 text-center">
+                هذه العملية تضمن أن المساعد يستخدم أحدث المعلومات التي قدمتها.
+            </p>
+            <div className="text-center mt-8">
+                <button
+                    onClick={onClose}
+                    className="px-10 py-3 bg-amber-600 text-white text-lg font-bold rounded-full hover:bg-amber-700 transition-colors shadow-md hover:shadow-lg transform hover:scale-105"
+                >
+                    لقد فهمت
+                </button>
+            </div>
+        </div>
+    </div>
+);
+
 export const AdminPage: React.FC = () => {
     const [processedFiles, setProcessedFiles] = useState<ProcessedFile[]>([]);
     const [parsingFiles, setParsingFiles] = useState<string[]>([]);
-    const [saved, setSaved] = useState(false);
-    const [saving, setSaving] = useState(false);
+    const [showInstructions, setShowInstructions] = useState(false);
     
     const processFile = useCallback(async (file: File) => {
         const fileName = file.name;
@@ -78,9 +113,7 @@ export const AdminPage: React.FC = () => {
         setProcessedFiles(prev => prev.filter(file => file.name !== fileNameToRemove));
     };
 
-    const handleSave = () => {
-        setSaving(true);
-        
+    const handleDownloadAndShowInstructions = () => {
         const allFileNames = processedFiles.map(file => file.name);
         const allChunks = processedFiles.flatMap(file => 
             file.text.split(/\n\s*\n+/)
@@ -90,7 +123,6 @@ export const AdminPage: React.FC = () => {
 
         if (allChunks.length === 0) {
             alert('لم يتم استخلاص أي محتوى صالح من الملفات. يرجى التأكد من أن الملفات تحتوي على نص.');
-            setSaving(false);
             return;
         }
 
@@ -110,9 +142,7 @@ export const AdminPage: React.FC = () => {
         document.body.removeChild(a);
         URL.revokeObjectURL(downloadUrl);
         
-        setSaving(false);
-        setSaved(true);
-        setTimeout(() => setSaved(false), 3000);
+        setShowInstructions(true);
     };
 
     return (
@@ -174,15 +204,17 @@ export const AdminPage: React.FC = () => {
                 
                 <div className="text-center pt-4">
                     <button
-                        onClick={handleSave}
+                        onClick={handleDownloadAndShowInstructions}
                         className="flex items-center justify-center gap-3 w-full sm:w-auto px-10 py-4 text-xl font-bold rounded-full transition-all duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-4 bg-wavy-gold-button text-black focus:ring-amber-500 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
-                        disabled={saving || saved || parsingFiles.length > 0 || processedFiles.length === 0}
+                        disabled={parsingFiles.length > 0 || processedFiles.length === 0}
                     >
-                        {saving ? 'جاري التجهيز...' : (saved ? <><CheckCircleIcon /> تم التنزيل!</> : 'تنزيل ملف المعرفة')}
+                        <CheckCircleIcon />
+                        <span>تنزيل ملف المعرفة</span>
                     </button>
-                     {saved && <p className="text-green-700 mt-2">تم تنزيل ملف `knowledge.json` بنجاح.</p>}
                 </div>
             </div>
+            
+            {showInstructions && <InstructionsModal onClose={() => setShowInstructions(false)} />}
         </div>
     );
 };
