@@ -1,8 +1,9 @@
+
 import React, { useState, useCallback } from 'react';
 import { VoiceExperience } from './VoiceExperience';
 import { AdminPage } from './AdminPage';
 import { ApiKeyManager } from './components/ApiKeyManager';
-import { XIcon } from './components/Icons';
+import { XIcon, KeyIcon } from './components/Icons';
 import { useVoiceAssistant } from './hooks/useVoiceAssistant';
 import { CallControlButton } from './components/CallControlButton';
 
@@ -57,13 +58,22 @@ const App: React.FC = () => {
                     <div className="flex items-center gap-3">
                          <h1 className="text-base sm:text-lg font-bold text-black text-center">مساعد مشروع العلاج لأطباء القاهرة</h1>
                     </div>
-                    <button 
-                        onClick={() => setIsChatOpen(false)} 
-                        className="p-2 rounded-full text-amber-800 hover:bg-black/10 transition-colors"
-                        aria-label="إغلاق المحادثة"
-                    >
-                        <XIcon className="w-6 h-6"/>
-                    </button>
+                    <div className="flex items-center gap-1">
+                        <button
+                            onClick={() => setIsApiKeyManagerOpen(true)}
+                            className="p-2 rounded-full text-amber-800 hover:bg-black/10 transition-colors"
+                            aria-label="إدارة مفتاح API"
+                        >
+                            <KeyIcon className="w-6 h-6" />
+                        </button>
+                        <button 
+                            onClick={() => setIsChatOpen(false)} 
+                            className="p-2 rounded-full text-amber-800 hover:bg-black/10 transition-colors"
+                            aria-label="إغلاق المحادثة"
+                        >
+                            <XIcon className="w-6 h-6"/>
+                        </button>
+                    </div>
                 </header>
                 <div className="flex-1 flex flex-col overflow-y-hidden">
                      <VoiceExperience 
